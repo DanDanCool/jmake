@@ -2,10 +2,10 @@
 name = "jmake"
 description = "C++ build system"
 readme = "README.md"
-version = "0.0.1"
 requires-python = ">=3.7"
 license = { file = "LICENSE" }
+dynamic = [ "version" ]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

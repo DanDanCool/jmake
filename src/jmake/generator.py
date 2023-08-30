@@ -1,6 +1,6 @@
-import jmake.py
 from pathlib import Path
-from uuid import uuid1
+from uuid import uuid4
+from . import jmake
 
 
 class Generator:
@@ -9,9 +9,9 @@ class Generator:
 
 
 class XMLWriter:
-    def __init__():
-        elements = []
-        data = """<?xml version="1.0" encoding="utf-8"?>"""
+    def __init__(self):
+        self.elements = []
+        self.data = """<?xml version="1.0" encoding="utf-8"?>"""
 
     def wrap(self, element):
         return "<" + element + ">"
@@ -20,28 +20,28 @@ class XMLWriter:
         return "</" + element + ">"
 
     def push(self, element, properties=""):
-        pad = "  " * len(elements)
-        elements.append(element)
+        pad = "  " * len(self.elements)
+        self.elements.append(element)
 
         element += " " + properties
-        data += "\n" + pad + wrap(element.rstrip())
+        self.data += "\n" + pad + self.wrap(element.rstrip())
 
     def pop(self, element):
-        while len(elements):
-            item = elements.pop()
-            pad = "  " * len(elements)
-            data += "\n" + pad + unwrap(item)
+        while len(self.elements):
+            item = self.elements.pop()
+            pad = "  " * len(self.elements)
+            self.data += "\n" + pad + self.unwrap(item)
             if item == element:
                 break
 
     def item(self, element, value, label=""):
-        pad = "  " * len(elements)
+        pad = "  " * len(self.elements)
         left = element + " " + label
-        data += "\n" + pad + wrap(left.rstrip()) + value + unwrap(element)
+        self.data += "\n" + pad + self.wrap(left.rstrip()) + value + self.unwrap(element)
 
     def single(self, value):
-        pad = "  " * len(elements)
-        data += "\n" + pad + wrap(value + "/")
+        pad = "  " * len(self.elements)
+        self.data += "\n" + pad + self.wrap(value + "/")
 
 
 class VSGenerator(Generator):
@@ -65,25 +65,29 @@ class VSGenerator(Generator):
                 "c17": "stdc17"
                 }
         self._ext = {
-                jmake.Target.EXECUTABLE: ".exe"
-                jmake.Target.SHARED_LIBRARY: ".dll"
+                jmake.Target.EXECUTABLE: ".exe",
+                jmake.Target.SHARED_LIBRARY: ".dll",
                 jmake.Target.STATIC_LIBRARY: ".lib"
                 }
         self._uuid = {}
 
     def vcxproj(self, project):
         writer = XMLWriter()
-        header = "DefaultTargets=\"Build\" ToolsVersion=\"" + self._version[jmake.host.vs] + "\"
-        xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\""
+        host = jmake.Host()
+        xmlns =  "\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\""
+        header = "DefaultTargets=\"Build\" ToolsVersion=\"" + self._version[host.vs] + xmlns
         writer.push("Project", header)
+        writer.push("PropertyGroup")
+        writer.item("PreferredToolArchitecture", "x64")
+        writer.pop("PropertyGroup")
 
         options = project.options(self._workspace._configs)
 
         writer.push("ItemGroup", "Label=\"ProjectConfigurations\"")
-        for name, config in project._filters:
-            properties = "Include=\"" + name.capitalize() + "|x64\""
+        for config in self._workspace._configs:
+            properties = "Include=\"" + config.capitalize() + "|x64\""
             writer.push("ProjectConfiguration", properties)
-            writer.item("Configuration", name.capitalize())
+            writer.item("Configuration", config.capitalize())
             writer.item("Platform", "x64")
             writer.pop("ProjectConfiguration")
         writer.pop("ItemGroup")
@@ -91,8 +95,9 @@ class VSGenerator(Generator):
         uuid = self._uuid[project._name]
         writer.push("PropertyGroup", "Label=\"Globals\"")
         writer.item("ProjectGuid", "{" + uuid + "}")
-        writer.item("VCProjectVersion", self._version[jmake.host.vs])
+        writer.item("VCProjectVersion", self._version[host.vs])
         writer.item("Keyword", "Win32Proj")
+        writer.item("Platform", "x64")
         writer.item("ProjectName", project._name)
         writer.pop("PropertyGroup")
 
@@ -106,38 +111,38 @@ class VSGenerator(Generator):
         elif project._target == jmake.Target.STATIC_LIBRARY:
             target = "StaticLibrary"
 
-        for config in self._workspace.configs:
+        for config in self._workspace._configs:
             condition = "Condition=\"'$(Configuration)|$(Platform)'=='" + config.capitalize() + "|x64'\""
             writer.push("PropertyGroup", condition + " Label=\"Configuration\"")
             writer.item("ConfigurationType", target)
-            writer.item("PlatformToolset", self._toolset[jmake.host.vs])
-            writer.item("UseDebugLibraries", str(options[config]["debug"]).lower())
+            writer.item("PlatformToolset", self._toolset[host.vs])
             writer.item("CharacterSet", "Unicode")
+            writer.pop("PropertyGroup")
 
         writer.single("Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.props\"")
         writer.push("ImportGroup", "Label=\"ExtensionSettings\"")
         writer.pop("ImportGroup")
         writer.push("ImportGroup", "Label=\"PropertySheets\"")
-        label = "Project=\"$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props\"
-        Condition=\"exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')\" Label=\"LocalAppDataPlatform\""
-        writer.single("Import", label)
+        label = "Project=\"$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props\""
+        condition = " Condition=\"exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')\" Label=\"LocalAppDataPlatform\""
+        writer.single("Import " + label + condition)
         writer.pop("ImportGroup")
 
         writer.push("PropertyGroup")
-        for config in self._workspace.configs:
-            outpath = str(Path(self._workspace.bin + "/" conf).absolute()) + "\\" + config.capitalize() + "\\"
+        for config in self._workspace._configs:
+            outpath = str(Path(self._workspace.bin).absolute() / config.capitalize()) + "\\"
             intpath = project._name + ".dir\\" + config.capitalize() + "\\"
             condition = "Condition=\"'$(Configuration)|$(Platform)'=='" + config.capitalize() + "|x64'\""
             writer.item("OutDir", outpath, condition)
             writer.item("IntDir", intpath, condition)
             writer.item("TargetName", project._name, condition)
             writer.item("TargetExt", self._ext[project._target], condition)
-            writer.item("LinkIncremental", str(options[config]["debug"]).lower, condition)
+            writer.item("LinkIncremental", str(options[config]["debug"]).lower(), condition)
             writer.item("GenerateManifest", "true", condition)
         writer.pop("PropertyGroup")
 
-        for config in _self._workspace._configs:
-            condition = "Condition='$(Configuration)|$(Platform)'==" + "'" + config.capitalize() + "|x64" "'"
+        for config in self._workspace._configs:
+            condition = "Condition=\"'$(Configuration)|$(Platform)'=='" + config.capitalize() + "|x64" "'\""
             writer.push("ItemDefinitionGroup", condition)
             writer.push("ClCompile")
             include = "%(AdditionalIncludeDirectories)"
@@ -147,13 +152,18 @@ class VSGenerator(Generator):
             writer.item("AdditionalIncludeDirectories", include)
             writer.item("AssemblerListingLocation", "$(IntDir)")
             writer.item("ExceptionHandling", "Sync")
-            writer.item("LanguageStandard", self._lang[self._workspace.lang])
+            optimize = "Disabled" if options[config]["debug"] else "MaxSpeed"
+            writer.item("Optimization", optimize)
+            if "cpp" in self._workspace.lang:
+                writer.item("LanguageStandard", self._lang[self._workspace.lang])
+            else:
+                writer.item("LanguageStandard_C", self._lang[self._workspace.lang])
             writer.item("PrecompiledHeader", "NotUsing")
 
             runtime = "MultiThreaded"
-            if config["debug"]:
+            if options[config]["debug"]:
                 runtime += "Debug"
-            if config["libc"] == "mtd":
+            if self._workspace.libc == "mtd":
                 runtime += "DLL"
             writer.item("RuntimeLibrary", runtime)
             writer.item("RuntimeTypeInfo", str(options[config]["rtti"]).lower())
@@ -168,7 +178,7 @@ class VSGenerator(Generator):
             for define, value in options[config]["defines"].items():
                 tmp = define
                 if value:
-                    value = "\"" + value "\"" if type(value) == str else str(value)
+                    value = "\"" + value + "\"" if type(value) == str else str(value)
                     tmp = define + "=" + value
                 preprocessor += ";" + tmp
             writer.item("PreprocessorDefinitions", preprocessor)
@@ -178,7 +188,8 @@ class VSGenerator(Generator):
             writer.push("Link")
             deps = "$(CoreLibraryDependencies);%(AdditionalDependencies)"
             for dependency in options[config]["depends"]:
-                deps += ";" + dependency + ".lib"
+                lib = config.capitalize() + "\\" + dependency + ".lib"
+                deps += ";" + lib
             writer.item("AdditionalDependencies", deps)
 
             libdirs = "%(AdditionalLibraryDirectories)"
@@ -214,7 +225,7 @@ class VSGenerator(Generator):
 
         writer.push("ItemGroup")
         for fname in project._files:
-            p = Path(self._workspace.src + "/" + fname).absolute()
+            p = Path(project.src + "/" + fname).absolute()
             element = "ClCompile" if p.suffix in [".cpp", ".c"] else "ClInclude"
             writer.single(element + " Include=\"" + str(p) + "\"")
         writer.pop("ItemGroup")
@@ -223,7 +234,8 @@ class VSGenerator(Generator):
         for dep in project._dependencies:
             if type(dep) != jmake.Project:
                 continue
-            writer.push("ProjectReference")
+            vcxproj = Path(self._workspace.bin).absolute() / (dep._name + ".vcxproj")
+            writer.push("ProjectReference", "Include=\"" + str(vcxproj) + "\"")
             writer.item("Project", "{" + self._uuid[dep._name] + "}")
             writer.item("Name", dep._name)
             writer.pop("ProjectReference")
@@ -240,16 +252,15 @@ class VSGenerator(Generator):
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
         """
-        for project in workspace:
+        for project in workspace._projects:
             names = "\"" + project._name + "\", \"" + project._name + ".vcxproj\", \"{" + self._uuid[project._name] + "}\""
             section = "\nProject(\"{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}\") = " + names
             deps = [ dependency for dependency in project._dependencies if type(dependency) == jmake.Project ]
-            if len(deps):
-                section += "\n\tProjectSection(ProjectDependencies) = postProject"
-                for dependency in deps:
-                    uuid = "{" + self._uuid[project._name] + "}"
-                    section += "\n\t\t" + uuid + " = " + uuid
-                section += "\n\tEndProjectSection"
+            section += "\n\tProjectSection(ProjectDependencies) = postProject"
+            for dependency in deps:
+                uuid = "{" + self._uuid[project._name] + "}"
+                section += "\n\t\t" + uuid + " = " + uuid
+            section += "\n\tEndProjectSection"
             section += "\nEndProject"
             data += section
         data += "\nGlobal"
@@ -259,7 +270,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
             data += "\n\t\t" + config + " = " + config
         data += "\n\tEndGlobalSection"
         data += "\n\tGlobalSection(ProjectConfigurationPlatforms) = postSolution"
-        for project in workspace:
+        for project in workspace._projects:
             uuid = "{" + self._uuid[project._name] + "}"
             for config in workspace._configs:
                 config = config.capitalize() + "|x64"
@@ -267,7 +278,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
                 data += "\n\t\t" + uuid + "." + config + ".Build.0 = " + config
         data += "\n\tEndGlobalSection"
         data += "\n\tGlobalSection(ExtensibilityGlobals) = postSolution"
-        data += "\n\t\tSolutionGuid = {" + str(uuid1()) + "}"
+        data += "\n\t\tSolutionGuid = {" + str(uuid4()) + "}"
         data += "\n\tEndGlobalSection"
         data += "\n\tGlobalSection(ExtensibilityAddIns) = postSolution"
         data += "\n\tEndGlobalSection"
@@ -277,15 +288,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
     def generate(self, workspace):
         self._uuid = {}
         self._workspace = workspace
+        Path(workspace.bin).mkdir(exist_ok=True)
         for project in workspace._projects:
-            self._uuid[project._name] = str(uuid1())
+            uuid = str(uuid4()).upper()
+            self._uuid[project._name] = uuid
         for project in workspace._projects:
             data = self.vcxproj(project)
-            path = Path(workspace.bin) / (project._name + ".vcxproj")
+            path = Path(workspace.bin).absolute() / (project._name + ".vcxproj")
             path.write_text(data)
         data = self.sln(workspace)
-        path = Path(workspace.bin) / (workspace._name + ".sln")
+        path = Path(workspace.bin).absolute() / (workspace._name + ".sln")
         path.write_text(data)
+
 
 class MakeGenerator(Generator):
     def __init__(self):

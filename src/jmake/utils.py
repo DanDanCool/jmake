@@ -3,35 +3,40 @@ import os.path
 from pathlib import Path
 import argparse
 import importlib
-import jmake
-import generator
+from . import jmake
+from . import generator
+
 
 def glob(dname, expr):
     p = Path(dname)
     return [ path.name for path in p.glob(expr) ]
 
 
-
 def package(url, branch=None):
     stem = str.split(name, sep='/')[-1]
-    if !os.path.exists(host.lib + "/" + stem):
+    host = jmake.Host()
+    if not os.path.exists(host.lib + "/" + stem):
+        os.system("git submodule update --init --recursive")
+    if not os.path.exists(host.lib + "/" + stem):
         branch = "-b " + branch if branch else ""
         cmd = "git submodule add " + branch + repo + " " + host.lib
         os.system(cmd)
 
     path = host.lib + "." + stem + "." + stem + ".py"
-    m = importlib.import(path)
+    m = importlib.import_module(path)
     return m.workspace
 
 
 def _build(workspace, args):
-    if !os.path.exists(".git"):
+    if not os.path.exists(".git"):
         return
+
 
 def _generate(workspace, args):
-    if !os.path.exists(".git"):
+    if not os.path.exists(".git"):
         return
 
+    host = jmake.Host()
     gen = generator.factory(host.generator)
     for w in workspace:
         gen.generate(w)
@@ -45,7 +50,7 @@ def _setup_env():
             break
         os.chdir("..")
 
-    if !found:
+    if not found:
         print("could not find root directory, quitting...")
 
 
@@ -58,7 +63,7 @@ def _postbuild_events(workspace, args):
 
 
 def generate(workspace):
-    if type(workspace) == Workspace:
+    if type(workspace) == jmake.Workspace:
         workspace = [ workspace ]
 
     parser = argparse.ArgumentParser(description='build script')

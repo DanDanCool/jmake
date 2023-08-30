@@ -4,7 +4,7 @@ workspace = jmake.Workspace("hello")
 workspace.src = "src"
 workspace.bin = "bin"
 
-lib = jmake.Project("library", target=jmake.Target.LIBRARY)
+lib = jmake.Project("library", target=jmake.Target.SHARED_LIBRARY)
 
 # import from github
 premake = jmake.package("premake/premake-core", branch="4.x")
@@ -27,7 +27,8 @@ workspace.add(exe)
 
 @jmake.prebuild(lib)
 def copyfiles(project):
-  if jmake.host.os == "windows":
-    pass
+    host = jmake.Host()
+    if jmake.host.os == "windows":
+        pass
 
 jmake.generate(workspace)

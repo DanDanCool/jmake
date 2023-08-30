@@ -4,6 +4,7 @@ from .jmake import Target
 from .jmake import Platform
 from .jmake import prebuild
 from .jmake import postbuild
+from .jmake import Host
 
 from .utils import glob
 from .utils import package

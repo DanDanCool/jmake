@@ -19,7 +19,14 @@ Platform = Enum('Platform', [
 
 
 class Host:
-    def __init__(self):
+    _instance = None
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(Host, cls).__new__(cls)
+            cls._instance.init()
+        return cls._instance
+
+    def init(self):
         self.os = Platform.UNKNOWN
         self.generator = ""
         if sys.platform.startswith('linux'):
@@ -36,9 +43,6 @@ class Host:
         self._postbuild = []
         self.lib = "lib"
         self.config = "debug"
-
-
-host = Host()
 
 
 class CODE:
@@ -61,6 +65,8 @@ class Project:
         self.includes = []
         self.libpaths = []
 
+        self.src = "src"
+
         self._options = {}
         self._filters = {}
         self._prebuild = []
@@ -72,6 +78,7 @@ class Project:
         self["rtti"] = True
         self["warn"] = 3
         self["binary_only"] = False
+        self["optimization"] = False
 
     def add(self, files):
         if type(files) == str:
@@ -101,7 +108,7 @@ class Project:
 
     def filter(self, config):
         f = Project(config, self._target)
-        for key, val in self._options:
+        for key, val in self._options.items():
             f[key] = val
         self._filters[config] = f
         return f
@@ -113,6 +120,7 @@ class Project:
             opt[config] = projfilter._options | {}
             opt[config]["defines"] = self._defines | projfilter._defines
             inc = self._include_dirs + (projfilter._include_dirs if config in self._filters else [])
+            inc.append(self.src)
             lib = self._library_dirs + (projfilter._library_dirs if config in self._filters else [])
             dep = []
             for dependency in self._dependencies:
@@ -158,13 +166,12 @@ class Workspace:
         self._projects = []
         self._configs = ["debug", "release"]
 
-        self.src = "src"
         self.bin = "bin"
         self.lang = "cpp17"
         self.libc = "mt"
 
     def add(self, project):
-        if type(project) == project:
+        if type(project) == Project:
             self._projects.append(project)
         if type(project) == list:
             self._projects.extend(project)
@@ -177,7 +184,7 @@ class Workspace:
 
 def prebuild(project=None):
     def global_prebuild(func):
-        global host
+        host = Host()
         host._prebuild.append(func)
         return func
 
@@ -190,7 +197,7 @@ def prebuild(project=None):
 
 def postbuild(project=None):
     def global_prebuild(func):
-        global host
+        host = Host()
         host._prebuild.append(func)
         return func
 
