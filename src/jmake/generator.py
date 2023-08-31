@@ -225,7 +225,7 @@ class VSGenerator(Generator):
 
         writer.push("ItemGroup")
         for fname in project._files:
-            p = Path(project.src + "/" + fname).absolute()
+            p = Path(fname).absolute()
             element = "ClCompile" if p.suffix in [".cpp", ".c"] else "ClInclude"
             writer.single(element + " Include=\"" + str(p) + "\"")
         writer.pop("ItemGroup")
@@ -252,7 +252,7 @@ class VSGenerator(Generator):
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
         """
-        for project in workspace._projects:
+        for project in workspace._projects.values():
             names = "\"" + project._name + "\", \"" + project._name + ".vcxproj\", \"{" + self._uuid[project._name] + "}\""
             section = "\nProject(\"{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}\") = " + names
             deps = [ dependency for dependency in project._dependencies if type(dependency) == jmake.Project ]
@@ -270,7 +270,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
             data += "\n\t\t" + config + " = " + config
         data += "\n\tEndGlobalSection"
         data += "\n\tGlobalSection(ProjectConfigurationPlatforms) = postSolution"
-        for project in workspace._projects:
+        for project in workspace._projects.values():
             uuid = "{" + self._uuid[project._name] + "}"
             for config in workspace._configs:
                 config = config.capitalize() + "|x64"
@@ -289,10 +289,10 @@ Microsoft Visual Studio Solution File, Format Version 12.00
         self._uuid = {}
         self._workspace = workspace
         Path(workspace.bin).mkdir(exist_ok=True)
-        for project in workspace._projects:
+        for project in workspace._projects.values():
             uuid = str(uuid4()).upper()
             self._uuid[project._name] = uuid
-        for project in workspace._projects:
+        for project in workspace._projects.values():
             data = self.vcxproj(project)
             path = Path(workspace.bin).absolute() / (project._name + ".vcxproj")
             path.write_text(data)

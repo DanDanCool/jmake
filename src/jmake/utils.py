@@ -5,24 +5,33 @@ import argparse
 import importlib
 from . import jmake
 from . import generator
+from . import scriptenv
 
 
 def glob(dname, expr):
-    p = Path(dname)
-    return [ path.name for path in p.glob(expr) ]
+    env = scriptenv.scriptenv()
+    p = env["path"] / dname
+    return [ str(path.absolute()) for path in p.glob(expr) ]
 
 
-def package(url, branch=None):
-    stem = str.split(name, sep='/')[-1]
+def fullpath(dname):
+    env = scriptenv.scriptenv()
+    if type(dname) != list:
+        dname = [dname]
+    return [ str(env["path"] / path) for path in dname ]
+
+
+def package(name, url, branch=None):
     host = jmake.Host()
-    if not os.path.exists(host.lib + "/" + stem):
+    if not os.path.exists(host.lib + "/" + name):
         os.system("git submodule update --init --recursive")
-    if not os.path.exists(host.lib + "/" + stem):
-        branch = "-b " + branch if branch else ""
-        cmd = "git submodule add " + branch + repo + " " + host.lib
+    if not os.path.exists(host.lib + "/" + name):
+        branch = "-b " + branch + " " if branch else ""
+        cmd = "git submodule add " + branch + url + " lib/" + name
+        print(cmd)
         os.system(cmd)
 
-    path = host.lib + "." + stem + "." + stem + ".py"
+    path = host.lib + "." + name + "." + name
     m = importlib.import_module(path)
     return m.workspace
 
@@ -42,24 +51,14 @@ def _generate(workspace, args):
         gen.generate(w)
 
 
-def _setup_env():
-    found = False
-    for i in range(32):
-        if os.path.exists(".git"):
-            found = True
-            break
-        os.chdir("..")
-
-    if not found:
-        print("could not find root directory, quitting...")
-
-
 def _prebuild_events(workspace, args):
-    _setup_env()
+    scriptenv.setupenv()
+    print("hello from prebuild")
 
 
 def _postbuild_events(workspace, args):
-    _setup_env()
+    scriptenv.setupenv()
+    print("hello from postbuild")
 
 
 def generate(workspace):

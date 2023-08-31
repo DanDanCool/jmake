@@ -65,8 +65,6 @@ class Project:
         self.includes = []
         self.libpaths = []
 
-        self.src = "src"
-
         self._options = {}
         self._filters = {}
         self._prebuild = []
@@ -104,7 +102,7 @@ class Project:
         if type(dependency) == list:
             self._dependencies.extend(dependency)
         if type(dependency) == Workspace:
-            self._depencencies.extend(dependency.libraries())
+            self._dependencies.extend(dependency.libraries())
 
     def filter(self, config):
         f = Project(config, self._target)
@@ -120,7 +118,6 @@ class Project:
             opt[config] = projfilter._options | {}
             opt[config]["defines"] = self._defines | projfilter._defines
             inc = self._include_dirs + (projfilter._include_dirs if config in self._filters else [])
-            inc.append(self.src)
             lib = self._library_dirs + (projfilter._library_dirs if config in self._filters else [])
             dep = []
             for dependency in self._dependencies:
@@ -163,7 +160,7 @@ class Project:
 class Workspace:
     def __init__(self, name):
         self._name = name
-        self._projects = []
+        self._projects = {}
         self._configs = ["debug", "release"]
 
         self.bin = "bin"
@@ -172,14 +169,22 @@ class Workspace:
 
     def add(self, project):
         if type(project) == Project:
-            self._projects.append(project)
-        if type(project) == list:
-            self._projects.extend(project)
+            project = [ project ]
+
+        for p in project:
+            if p._name in self._projects:
+                continue
+            self._projects[p._name] = p
+            deps = [ dep for dep in p._dependencies if type(dep) == Project ]
+            self.add(deps)
 
     def libraries(self):
         targets = [ Target.SHARED_LIBRARY, Target.STATIC_LIBRARY ]
-        libs = [project for project in self._projects if project._target in targets ]
+        libs = [project for project in self._projects.values() if project._target in targets ]
         return libs
+
+    def __getitem__(self, key):
+        return self._projects[key]
 
 
 def prebuild(project=None):
