@@ -62,6 +62,11 @@ def _postbuild_events(workspace, args):
 
 
 def generate(workspace):
+    env = scriptenv.scriptenv()
+    gitfolder = env["path"] / ".git"
+    if not os.path.exists(str(gitfolder)):
+        return
+
     if type(workspace) == jmake.Workspace:
         workspace = [ workspace ]
 
