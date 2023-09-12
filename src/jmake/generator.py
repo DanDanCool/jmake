@@ -150,6 +150,12 @@ class VSGenerator(Generator):
                 p = Path(directory).absolute()
                 include += ";" + str(p)
             writer.item("AdditionalIncludeDirectories", include)
+
+            compile_options = "%(AdditionalOptions)"
+            for flag in options[config]["compile"]:
+                compile_options += " " + flag
+            writer.item("AdditionalOptions", compile_options)
+
             writer.item("AssemblerListingLocation", "$(IntDir)")
             writer.item("ExceptionHandling", "Sync")
             optimize = "Disabled" if options[config]["debug"] else "MaxSpeed"
@@ -206,13 +212,13 @@ class VSGenerator(Generator):
             writer.pop("Link")
 
             writer.push("PreBuildEvent")
-            command = "python3 ../" + self._workspace._name + ".py prebuild -c " + config
+            command = f"python3 ../{self._workspace._name}.py prebuild -c {config} -p {project._name}"
             writer.item("Command", command)
             writer.item("Message", "jmake prebuild step config=" + config)
             writer.pop("PreBuildEvent")
 
             writer.push("PostBuildEvent")
-            command = "python3 ../" + self._workspace._name + ".py postbuild -c " + config
+            command = f"python3 ../{self._workspace._name}.py postbuild -c {config} -p {project._name}"
             writer.item("Command", command)
             writer.item("Message", "jmake postbuild step config=" + config)
             writer.pop("PostBuildEvent")

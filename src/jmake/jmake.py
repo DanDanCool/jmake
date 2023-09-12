@@ -59,6 +59,8 @@ class Project:
         self._dependencies = []
         self._include_dirs = []
         self._library_dirs = []
+        self._compile = []
+        self._link = []
 
         # for binary only projects
         self.binaries = []
@@ -89,6 +91,18 @@ class Project:
             self._include_dirs.append(dirs)
         if type(dirs) == list:
             self._include_dirs.extend(dirs)
+
+    def compile(self, options):
+        if type(options) == str:
+            self._compile.append(options)
+        if type(options) == list:
+            self._compile.extend(options)
+
+    def link(self, options):
+        if type(options) == str:
+            self._link.append(options)
+        if type(options) == list:
+            self._link.extend(options)
 
     def libpath(self, dirs):
         if type(dirs) == str:
@@ -133,6 +147,8 @@ class Project:
             opt[config]["includes"] = inc
             opt[config]["libpaths"] = lib
             opt[config]["depends"] = dep
+            opt[config]["compile"] = self._compile
+            opt[config]["link"] = self._link
 
         return opt
 
@@ -201,13 +217,13 @@ def prebuild(project=None):
 
 
 def postbuild(project=None):
-    def global_prebuild(func):
+    def global_postbuild(func):
         host = Host()
-        host._prebuild.append(func)
+        host._postbuild.append(func)
         return func
 
-    def project_prebuild(func):
-        project._prebuild.append(func)
+    def project_postbuild(func):
+        project._postbuild.append(func)
         return func
 
-    return global_prebuild if project == None else project_prebuild
+    return global_postbuild if project == None else project_postbuild

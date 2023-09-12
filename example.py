@@ -14,6 +14,9 @@ libfiles = jmake.glob("src", "*.h")
 lib.add(libfiles)
 lib.depend(premake)
 
+lib.compile("/experimental:c11atomics")
+lib.link("/export")
+
 debug = lib.filter("debug")
 debug.define("Debug", True)
 debug["optimization"] = False

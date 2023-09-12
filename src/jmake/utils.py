@@ -37,40 +37,42 @@ def package(name, url, branch=None):
 
 
 def _build(workspace, args):
-    if not os.path.exists(".git"):
+    env = scriptenv.scriptenv()
+    gitfolder = env["path"] / ".git"
+    if not gitfolder.is_dir():
         return
 
 
 def _generate(workspace, args):
-    if not os.path.exists(".git"):
-        return
+    host = jmake.Host();
+    print("generating make files for " + host.generator)
 
     host = jmake.Host()
     gen = generator.factory(host.generator)
-    for w in workspace:
-        gen.generate(w)
+    gen.generate(workspace)
 
 
 def _prebuild_events(workspace, args):
     scriptenv.setupenv()
-    print("hello from prebuild")
+    print("running prebuild events...")
+    workspace[args.p].prebuild()
 
 
 def _postbuild_events(workspace, args):
     scriptenv.setupenv()
-    print("hello from postbuild")
+    print("running postbuild events...")
+    workspace[args.p].postbuild()
 
 
 def generate(workspace):
     env = scriptenv.scriptenv()
     gitfolder = env["path"] / ".git"
-    if not os.path.exists(str(gitfolder)):
+    if not gitfolder.is_dir():
         return
 
-    if type(workspace) == jmake.Workspace:
-        workspace = [ workspace ]
-
     parser = argparse.ArgumentParser(description='build script')
+    parser.set_defaults(func=_generate)
+
     subparser = parser.add_subparsers()
 
     build_parser = subparser.add_parser('build')
@@ -81,10 +83,12 @@ def generate(workspace):
 
     pre_parser = subparser.add_parser('prebuild')
     pre_parser.add_argument('-c')
+    pre_parser.add_argument('-p')
     pre_parser.set_defaults(func=_prebuild_events)
 
     post_parser = subparser.add_parser('postbuild')
     post_parser.add_argument('-c')
+    post_parser.add_argument('-p')
     post_parser.set_defaults(func=_postbuild_events)
 
     args = parser.parse_args()
