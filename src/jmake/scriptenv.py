@@ -1,6 +1,10 @@
 import inspect
+import argparse
 from pathlib import Path
 import os.path
+import sys
+
+from . import jmake
 
 def scriptenv():
     g = inspect.currentframe().f_back.f_back.f_globals
@@ -20,4 +24,5 @@ def setupenv():
     if not found:
         print("could not find root directory, quitting...")
 
-
+    host = jmake.Host()
+    host.mode = 'generate' if len(sys.argv) <= 1 else sys.argv[1]

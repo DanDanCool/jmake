@@ -43,6 +43,7 @@ class Host:
         self._postbuild = []
         self.lib = "lib"
         self.config = "debug"
+        self.mode = "generate"
 
 
 class CODE:
