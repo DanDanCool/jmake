@@ -1,5 +1,7 @@
 import jmake
 
+jmake.setupenv()
+
 workspace = jmake.Workspace("hello")
 workspace.src = "src"
 workspace.bin = "bin"
@@ -7,7 +9,7 @@ workspace.bin = "bin"
 lib = jmake.Project("library", target=jmake.Target.SHARED_LIBRARY)
 
 # import from github
-premake = jmake.package("premake/premake-core", branch="4.x")
+premake = jmake.package("premake", "premake/premake-core", branch="4.x")
 
 # append "**/" to recurse
 libfiles = jmake.glob("src", "*.h")
@@ -31,7 +33,7 @@ workspace.add(exe)
 @jmake.prebuild(lib)
 def copyfiles(project):
     host = jmake.Host()
-    if jmake.host.os == "windows":
+    if host.os == "windows":
         pass
 
 jmake.generate(workspace)

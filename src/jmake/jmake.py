@@ -150,6 +150,9 @@ class Project:
             opt[config]["compile"] = self._compile
             opt[config]["link"] = self._link
 
+        # remove duplicated file names
+        unique = { fname for fname in self._files }
+        self._files = [ fname for fname in unique ]
         return opt
 
     def define(self, key, value):

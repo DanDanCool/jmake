@@ -1,8 +1,8 @@
-import os
-import os.path
 from pathlib import Path
 import argparse
 import importlib
+import subprocess
+from . import builtin
 from . import jmake
 from . import generator
 from . import scriptenv
@@ -21,17 +21,24 @@ def fullpath(dname):
     return [ str(env["path"] / path) for path in dname ]
 
 
-def package(name, url, branch=None):
-    host = jmake.Host()
-    if not os.path.exists(host.lib + "/" + name):
-        os.system("git submodule update --init --recursive")
-    if not os.path.exists(host.lib + "/" + name):
-        branch = "-b " + branch + " " if branch else ""
-        cmd = "git submodule add " + branch + url + " lib/" + name
-        print(cmd)
-        os.system(cmd)
+def package(name, url=None, branch=None):
+    if not url:
+        return builtin.package_builtin(name)
 
-    path = host.lib + "." + name + "." + name
+    host = jmake.Host()
+    path = Path(host.lib) / name
+    if not path.exists():
+        cmd = [ "git", "submodule", "update", "--init", "--recursive" ]
+        subprocess.run(cmd)
+    if not path.exists():
+        cmd = [ "git", "submodule", "add" ]
+        if branch:
+            cmd.extend([ "-b", branch ])
+        cmd.extend([ url, str(path / name) ])
+        print(cmd)
+        subprocess.run(cmd)
+
+    path = f"{host.lib}.{name}.{name}"
     m = importlib.import_module(path)
     return m.workspace
 

@@ -194,7 +194,9 @@ class VSGenerator(Generator):
             writer.push("Link")
             deps = "$(CoreLibraryDependencies);%(AdditionalDependencies)"
             for dependency in options[config]["depends"]:
-                lib = config.capitalize() + "\\" + dependency + ".lib"
+                lib = f"{dependency}.lib"
+                if dependency in self._workspace._projects:
+                    lib = f"{config.capitalize()}\\{lib}"
                 deps += ";" + lib
             writer.item("AdditionalDependencies", deps)
 
