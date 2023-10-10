@@ -71,16 +71,16 @@ def _postbuild_events(workspace, args):
     workspace[args.p].postbuild()
 
 
-def generate(workspace):
+def generate(workspace, parser=None, subparser=None):
     env = scriptenv.scriptenv()
     gitfolder = env["path"] / ".git"
     if not gitfolder.is_dir():
         return
 
-    parser = argparse.ArgumentParser(description='build script')
+    if not parser:
+        parser = argparse.ArgumentParser(description='build script')
+        subparser = parser.add_subparsers()
     parser.set_defaults(func=_generate)
-
-    subparser = parser.add_subparsers()
 
     build_parser = subparser.add_parser('build')
     build_parser.set_defaults(func=_build)
