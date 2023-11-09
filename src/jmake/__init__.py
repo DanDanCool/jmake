@@ -10,4 +10,5 @@ from .utils import glob
 from .utils import package
 from .utils import generate
 from .utils import fullpath
+from .utils import configure_file
 from .scriptenv import setupenv

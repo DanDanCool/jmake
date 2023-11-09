@@ -301,6 +301,8 @@ Microsoft Visual Studio Solution File, Format Version 12.00
             uuid = str(uuid4()).upper()
             self._uuid[project._name] = uuid
         for project in workspace._projects.values():
+            if project["binary_only"] or project._target == jmake.Target.HEADER_LIBRARY:
+                continue
             data = self.vcxproj(project)
             path = Path(workspace.bin).absolute() / (project._name + ".vcxproj")
             path.write_text(data)

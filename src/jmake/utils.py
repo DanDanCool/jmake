@@ -2,6 +2,7 @@ from pathlib import Path
 import argparse
 import importlib
 import subprocess
+import re
 from . import builtin
 from . import jmake
 from . import generator
@@ -9,43 +10,92 @@ from . import scriptenv
 
 
 def glob(dname, expr):
-    env = scriptenv.scriptenv()
-    p = env["path"] / dname
-    return [ str(path.absolute()) for path in p.glob(expr) ]
+    if type(expr) != list:
+        expr = [ expr ]
+    host = jmake.Host()
+    p = host.paths[-1] / dname
+
+    res = []
+    for e in expr:
+        res.extend([ str(path.absolute()) for path in p.glob(e) ])
+    return res
 
 
 def fullpath(dname):
-    env = scriptenv.scriptenv()
+    host = jmake.Host()
     if type(dname) != list:
         dname = [dname]
-    return [ str(env["path"] / path) for path in dname ]
+    return [ str(host.paths[-1] / path) for path in dname ]
 
 
+# note: local packages must have an empty .git file/folder so setupenv works correctly
 def package(name, url=None, branch=None):
-    if not url:
+    if 'builtin/' in name:
         return builtin.package_builtin(name)
 
     host = jmake.Host()
     path = Path(host.lib) / name
-    if not path.exists():
-        cmd = [ "git", "submodule", "update", "--init", "--recursive" ]
-        subprocess.run(cmd)
-    if not path.exists():
-        cmd = [ "git", "submodule", "add" ]
-        if branch:
-            cmd.extend([ "-b", branch ])
-        cmd.extend([ url, str(path / name) ])
-        print(cmd)
-        subprocess.run(cmd)
+    if url:
+        if not path.exists():
+            cmd = [ "git", "submodule", "update", "--init", "--recursive" ]
+            subprocess.run(cmd)
+        if not path.exists():
+            cmd = [ "git", "submodule", "add" ]
+            if branch:
+                cmd.extend([ "-b", branch ])
+            cmd.extend([ url, str(path) ])
+            subprocess.run(cmd)
+    else:
+        if not path.exists():
+            print(f"error, local package '{name}' specified but not found")
+            return None
 
     path = f"{host.lib}.{name}.{name}"
     m = importlib.import_module(path)
+    host.paths.pop() # cleanup paths
     return m.workspace
 
 
+# added for cmake compatibility
+def configure_file(fname_in, fname_out, opts={}):
+    lines = []
+    with open(fname_in) as f:
+        lines = f.readlines()
+
+    p = re.compile('@(\w+)@')
+    for i, line in enumerate(lines):
+        if not '#cmakedefine' in line:
+            matches = p.findall(line)
+            for m in matches:
+                if m not in opts:
+                    print(f"possible error on line {i}, {m} not found in opts\n{lines[i]}")
+                    continue
+                line = line.replace(f"@{m}@", str(opts[m]))
+            lines[i] = line
+            continue
+
+        tokens = line.expandtabs(1).split(' ')
+        varname = ''
+        for token in tokens:
+            if token == '': continue
+            valid = True
+            for discard in ['#cmakedefine']:
+                if discard in token:
+                    valid = False
+                    break
+            if not valid: continue
+            varname = token
+            break
+        if varname == '':
+            print(f"possible error on line {i}, variable name not found\n{line}")
+            continue
+        lines[i] = f"#define {varname} {opts[varname]}" if varname in opts else ''
+    with open(fname_out, 'w') as f:
+        f.writelines(lines)
+
 def _build(workspace, args):
-    env = scriptenv.scriptenv()
-    gitfolder = env["path"] / ".git"
+    host = jmake.Host()
+    gitfolder = host.paths[-1] / ".git"
     if not gitfolder.is_dir():
         return
 
@@ -60,20 +110,20 @@ def _generate(workspace, args):
 
 
 def _prebuild_events(workspace, args):
-    scriptenv.setupenv()
+    scriptenv.setupenv(False)
     print("running prebuild events...")
     workspace[args.p].prebuild()
 
 
 def _postbuild_events(workspace, args):
-    scriptenv.setupenv()
+    scriptenv.setupenv(False)
     print("running postbuild events...")
     workspace[args.p].postbuild()
 
 
 def generate(workspace, parser=None, subparser=None):
-    env = scriptenv.scriptenv()
-    gitfolder = env["path"] / ".git"
+    host = jmake.Host()
+    gitfolder = host.paths[-1] / ".git"
     if not gitfolder.is_dir():
         return
 

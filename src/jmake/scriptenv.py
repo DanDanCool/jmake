@@ -6,14 +6,7 @@ import sys
 
 from . import jmake
 
-def scriptenv():
-    g = inspect.currentframe().f_back.f_back.f_globals
-    env = {}
-    p = Path(g["__file__"]).absolute()
-    env["path"] = p.parent
-    return env
-
-def setupenv():
+def setupenv(needpath=True):
     found = False
     for i in range(32):
         if os.path.exists(".git"):
@@ -26,3 +19,8 @@ def setupenv():
 
     host = jmake.Host()
     host.mode = 'generate' if len(sys.argv) <= 1 else sys.argv[1]
+
+    if needpath:
+        g = inspect.currentframe().f_back.f_globals
+        p = Path(g["__file__"]).absolute()
+        host.paths.append(p.parent)

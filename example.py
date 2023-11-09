@@ -1,9 +1,8 @@
 import jmake
 
-jmake.setupenv()
+jmake.setupenv() # REQUIRED
 
 workspace = jmake.Workspace("hello")
-workspace.src = "src"
 workspace.bin = "bin"
 
 lib = jmake.Project("library", target=jmake.Target.SHARED_LIBRARY)

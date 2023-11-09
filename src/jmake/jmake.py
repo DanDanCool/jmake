@@ -7,7 +7,8 @@ import platform
 Target = Enum('Target', [
     'EXECUTABLE',
     'SHARED_LIBRARY',
-    'STATIC_LIBRARY'
+    'STATIC_LIBRARY',
+    'HEADER_LIBRARY'
     ])
 
 
@@ -44,11 +45,7 @@ class Host:
         self.lib = "lib"
         self.config = "debug"
         self.mode = "generate"
-
-
-class CODE:
-    def __init__(self, code):
-        self._code = code
+        self.paths = [] # stack of paths
 
 
 class Project:
