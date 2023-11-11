@@ -6,6 +6,9 @@ requires-python = ">=3.7"
 license = { file = "LICENSE" }
 dynamic = [ "version" ]
 
+[project.urls]
+"Homepage" = "https://github.com/DanDanCool/jmake"
+
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
