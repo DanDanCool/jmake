@@ -61,8 +61,8 @@ class Project:
         self._link = []
 
         # for binary only projects
-        self.binaries = []
         self.includes = []
+        self.binaries = []
         self.libpaths = []
 
         self._options = {}
@@ -109,19 +109,49 @@ class Project:
             self._library_dirs.extend(dirs)
 
     def depend(self, dependency):
-        if type(dependency) == str or type(dependency) == Project:
+        if type(dependency) in [ str, Project ]:
             self._dependencies.append(dependency)
         if type(dependency) == list:
             self._dependencies.extend(dependency)
         if type(dependency) == Workspace:
             self._dependencies.extend(dependency.libraries())
 
+    def export(self, includes=None, binaries=None, libpaths=None, append=False):
+        if includes:
+            if type(includes) != list:
+                includes = [ includes ]
+            if append:
+                self.includes.extend(includes)
+            else:
+                self.includes = includes
+        if binaries:
+            if type(binaries) != list:
+                binaries = [ binaries ]
+            if append:
+                self.binaries.extend(binaries)
+            else:
+                self.binaries = binaries
+        if libpaths:
+            if type(libpaths) != list:
+                libpaths = [ libpaths ]
+            if append:
+                self.libpaths.extend(binaries)
+            else:
+                self.libpaths = libpaths
+
     def filter(self, config):
         f = Project(config, self._target)
-        for key, val in self._options.items():
-            f[key] = val
+        f._options = self._options.copy()
         self._filters[config] = f
         return f
+
+    def dependencies(self):
+        dependencies = set()
+        for dependency in self._dependencies:
+            dependencies.add(dependency)
+            if type(dependency) == Project and dependency._target == Target.STATIC_LIBRARY:
+                dependencies |= dependency.dependencies()
+        return dependencies
 
     def options(self, configs):
         opt = {}
@@ -132,14 +162,14 @@ class Project:
             inc = self._include_dirs + (projfilter._include_dirs if config in self._filters else [])
             lib = self._library_dirs + (projfilter._library_dirs if config in self._filters else [])
             dep = []
-            for dependency in self._dependencies:
+            for dependency in self.dependencies():
                 if type(dependency) == str:
                     dep.append(dependency)
                 if type(dependency) == Project:
                     inc.extend(dependency.includes)
                     dep.extend(dependency.binaries)
                     lib.extend(dependency.libpaths)
-                    if not dependency["binary_only"]:
+                    if valid_dependency_project(dependency):
                         dep.append(dependency._name)
 
             opt[config]["includes"] = inc
@@ -156,13 +186,17 @@ class Project:
     def define(self, key, value):
         self._defines[key] = value
 
-    def prebuild(self):
+    def prebuild(self, config):
         for func in self._prebuild:
             func(self)
+        if config in self._filters:
+            self._filters[config].prebuild(config)
 
-    def postbuild(self):
+    def postbuild(self, config):
         for func in self._postbuild:
             func(self)
+        if config in self._filters:
+            self._filters[config].postbuild(config)
 
     def __getitem__(self, key):
         return self._options[key]
@@ -192,16 +226,23 @@ class Workspace:
             if p._name in self._projects:
                 continue
             self._projects[p._name] = p
-            deps = [ dep for dep in p._dependencies if type(dep) == Project ]
+
+            deps = [ dep for dep in p._dependencies if valid_dependency_project(dep) ]
             self.add(deps)
 
     def libraries(self):
-        targets = [ Target.SHARED_LIBRARY, Target.STATIC_LIBRARY ]
+        targets = [ Target.SHARED_LIBRARY, Target.STATIC_LIBRARY, Target.HEADER_LIBRARY ]
         libs = [project for project in self._projects.values() if project._target in targets ]
         return libs
 
     def __getitem__(self, key):
         return self._projects[key]
+
+
+# check if a dependency is a valid project
+def valid_dependency_project(project):
+    if type(project) != Project: return False
+    return (not project['binary_only']) and (project._target != Target.HEADER_LIBRARY)
 
 
 def prebuild(project=None):

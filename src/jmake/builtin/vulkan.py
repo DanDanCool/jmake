@@ -16,9 +16,7 @@ def findvulkan(proj):
         cmd = [ "pwsh", "-Command", "echo", "$env:VK_SDK_PATH" ]
         res = subprocess.run(cmd, capture_output=True, text=True)
         p = Path(res.stdout.replace('\n', '')).absolute()
-        vulkan.includes.append(str(p / 'Include'))
-        vulkan.libpaths.append(str(p / 'Lib'))
-        vulkan.binaries.append('vulkan-1')
+        vulkan.export(includes=str(p / 'Include'), binaries='vulkan-1', libpaths=str(p / 'Lib'))
 
 findvulkan(vulkan)
-workspace.add(vulkan)
+workspace.add(vulkan) # we suggest not including a jmake.generate in binary only projects

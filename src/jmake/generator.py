@@ -240,8 +240,7 @@ class VSGenerator(Generator):
 
         writer.push("ItemGroup")
         for dep in project._dependencies:
-            if type(dep) != jmake.Project:
-                continue
+            if not jmake.valid_dependency_project(dep): continue
             vcxproj = Path(self._workspace.bin).absolute() / (dep._name + ".vcxproj")
             writer.push("ProjectReference", "Include=\"" + str(vcxproj) + "\"")
             writer.item("Project", "{" + self._uuid[dep._name] + "}")
@@ -263,10 +262,10 @@ Microsoft Visual Studio Solution File, Format Version 12.00
         for project in workspace._projects.values():
             names = "\"" + project._name + "\", \"" + project._name + ".vcxproj\", \"{" + self._uuid[project._name] + "}\""
             section = "\nProject(\"{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}\") = " + names
-            deps = [ dependency for dependency in project._dependencies if type(dependency) == jmake.Project ]
+            deps = [ dependency for dependency in project._dependencies if jmake.valid_dependency_project(dependency) ]
             section += "\n\tProjectSection(ProjectDependencies) = postProject"
             for dependency in deps:
-                uuid = "{" + self._uuid[project._name] + "}"
+                uuid = "{" + self._uuid[dependency._name] + "}"
                 section += "\n\t\t" + uuid + " = " + uuid
             section += "\n\tEndProjectSection"
             section += "\nEndProject"

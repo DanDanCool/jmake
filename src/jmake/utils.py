@@ -21,11 +21,20 @@ def glob(dname, expr):
     return res
 
 
+# return a path expansion relative to the calling source file
 def fullpath(dname):
     host = jmake.Host()
     if type(dname) != list:
         dname = [dname]
     return [ str(host.paths[-1] / path) for path in dname ]
+
+
+# return a path expansion relative to the project root directory containing the .git folder
+def rootpath(dname):
+    host = jmake.Host()
+    if type(dname) != list:
+        dname = [dname]
+    return [ str(host.paths[0] / path) for path in dname ]
 
 
 # note: local packages must have an empty .git file/folder so setupenv works correctly
@@ -34,7 +43,7 @@ def package(name, url=None, branch=None):
         return builtin.package_builtin(name)
 
     host = jmake.Host()
-    path = Path(host.lib) / name
+    path = Path(rootpath(host.lib)[0]) / name
     if url:
         if not path.exists():
             cmd = [ "git", "submodule", "update", "--init", "--recursive" ]
@@ -51,8 +60,12 @@ def package(name, url=None, branch=None):
             return None
 
     path = f"{host.lib}.{name}.{name}"
+
+    size = len(host.paths)
     m = importlib.import_module(path)
-    host.paths.pop() # cleanup paths
+    if len(host.paths) > size:
+        host.paths.pop() # cleanup paths
+
     return m.workspace
 
 
@@ -112,13 +125,17 @@ def _generate(workspace, args):
 def _prebuild_events(workspace, args):
     scriptenv.setupenv(False)
     print("running prebuild events...")
-    workspace[args.p].prebuild()
+    host = jmake.Host()
+    host.config = args.c
+    workspace[args.p].prebuild(args.c)
 
 
 def _postbuild_events(workspace, args):
     scriptenv.setupenv(False)
     print("running postbuild events...")
-    workspace[args.p].postbuild()
+    host = jmake.Host()
+    host.config = args.c
+    workspace[args.p].postbuild(args.c)
 
 
 def generate(workspace, parser=None, subparser=None):
