@@ -2,9 +2,12 @@
 name = "jmake"
 description = "C++ build system"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 dynamic = [ "version" ]
+dependencies = [
+	"jmllib"
+]
 
 [project.urls]
 "Homepage" = "https://github.com/DanDanCool/jmake"

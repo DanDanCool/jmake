@@ -1,11 +1,64 @@
 from pathlib import Path
 from uuid import uuid4
+from hashlib import file_digest
+
 from . import jmake
+import jmllib
 
 
 class Generator:
     def generate(self, workspace):
         pass
+
+
+def get_cached(projects):
+    dirty = {}
+    host = jmake.Env()
+    p = Path(host.bin) / 'jmake/cache.jml'
+    if not p.is_file():
+        for project in projects:
+            with open(project._module, 'rb') as f:
+                digest = file_digest(f, 'md5')
+            dirty[project._name] = {
+                    'uuid': str(uuid4()).upper(),
+                    'hash': digest.hexdigest()
+                    }
+        p.parent.mkdir(exist_ok=True)
+        p.write_text(jmllib.dumps(dirty))
+
+        for v in dirty.values():
+            v['dirty'] = True
+
+        dirty['regenerate'] = True
+        return dirty
+
+    with open(p) as f:
+        cache = jmllib.load(f)
+
+    all = { 'regenerate': False }
+
+    for project in projects:
+        with open(project._module, 'rb') as f:
+            digest = file_digest(f, 'md5')
+        if project._name not in cache:
+            dirty[project._name] = {
+                'uuid': str(uuid4()).upper(),
+                'hash': digest.hexdigest()
+                    }
+            all[project._name] = { 'dirty': True } | dirty[project._name]
+            all['regenerate'] = True
+            continue
+        if cache[project._name]['hash'] != digest.hexdigest():
+            dirty[project._name] = {
+                'uuid': cache[project._name]['uuid'],
+                'hash': digest.hexdigest()
+                    }
+            all[project._name] = { 'dirty': True } | dirty[project._name]
+        else:
+            all[project._name] = { 'dirty': False } | cache[project._name]
+    if len(dirty):
+        p.write_text(jml.dumps(cache | dirty))
+    return all
 
 
 class XMLWriter:
@@ -73,7 +126,7 @@ class VSGenerator(Generator):
 
     def vcxproj(self, project):
         writer = XMLWriter()
-        host = jmake.Host()
+        host = jmake.Env()
         xmlns =  "\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\""
         header = "DefaultTargets=\"Build\" ToolsVersion=\"" + self._version[host.vs] + xmlns
         writer.push("Project", header)
@@ -130,7 +183,7 @@ class VSGenerator(Generator):
 
         writer.push("PropertyGroup")
         for config in self._workspace._configs:
-            outpath = str(Path(self._workspace.bin).absolute() / config.capitalize()) + "\\"
+            outpath = str(Path(host.bin).absolute() / config.capitalize()) + "\\"
             intpath = project._name + ".dir\\" + config.capitalize() + "\\"
             condition = "Condition=\"'$(Configuration)|$(Platform)'=='" + config.capitalize() + "|x64'\""
             writer.item("OutDir", outpath, condition)
@@ -207,20 +260,20 @@ class VSGenerator(Generator):
             writer.item("GenerateDebugInformation", str(options[config]["debug"]).lower())
             writer.item("IgnoreSpecificDefaultLibraries", "%(IgnoreSpecificDefaultLibraries)")
 
-            path = Path(self._workspace.bin).absolute() / config.capitalize()
+            path = Path(host.bin).absolute() / config.capitalize()
             writer.item("ImportLibrary", str(path / (project._name + ".lib")))
             writer.item("ProgramDataBaseFile", str(path / (project._name + ".pdb")))
             writer.item("SubSystem", "Console")
             writer.pop("Link")
 
             writer.push("PreBuildEvent")
-            command = f"python3 ../{self._workspace._name}.py prebuild -c {config} -p {project._name}"
+            command = f"python {str(Path(self._workspace._name + '.py').absolute())} prebuild -c {config} -p {project._name}"
             writer.item("Command", command)
             writer.item("Message", "jmake prebuild step config=" + config)
             writer.pop("PreBuildEvent")
 
             writer.push("PostBuildEvent")
-            command = f"python3 ../{self._workspace._name}.py postbuild -c {config} -p {project._name}"
+            command = f"python {str(Path(self._workspace._name + '.py').absolute())} postbuild -c {config} -p {project._name}"
             writer.item("Command", command)
             writer.item("Message", "jmake postbuild step config=" + config)
             writer.pop("PostBuildEvent")
@@ -241,7 +294,7 @@ class VSGenerator(Generator):
         writer.push("ItemGroup")
         for dep in project._dependencies:
             if not jmake.valid_dependency_project(dep): continue
-            vcxproj = Path(self._workspace.bin).absolute() / (dep._name + ".vcxproj")
+            vcxproj = Path(host.bin).absolute() / (dep._name + ".vcxproj")
             writer.push("ProjectReference", "Include=\"" + str(vcxproj) + "\"")
             writer.item("Project", "{" + self._uuid[dep._name] + "}")
             writer.item("Name", dep._name)
@@ -295,19 +348,23 @@ Microsoft Visual Studio Solution File, Format Version 12.00
     def generate(self, workspace):
         self._uuid = {}
         self._workspace = workspace
-        Path(workspace.bin).mkdir(exist_ok=True)
+
+        host = jmake.Env()
+        Path(host.bin).mkdir(exist_ok=True)
+
+        cache = get_cached(workspace._projects.values())
         for project in workspace._projects.values():
-            uuid = str(uuid4()).upper()
-            self._uuid[project._name] = uuid
+            self._uuid[project._name] = cache[project._name]['uuid']
         for project in workspace._projects.values():
-            if project["binary_only"] or project._target == jmake.Target.HEADER_LIBRARY:
+            if not jmake.valid_dependency_project(project) or not cache[project._name]['dirty']:
                 continue
             data = self.vcxproj(project)
-            path = Path(workspace.bin).absolute() / (project._name + ".vcxproj")
+            path = Path(host.bin).absolute() / (project._name + ".vcxproj")
             path.write_text(data)
-        data = self.sln(workspace)
-        path = Path(workspace.bin).absolute() / (workspace._name + ".sln")
-        path.write_text(data)
+        if cache['regenerate']:
+            data = self.sln(workspace)
+            path = Path(host.bin).absolute() / (workspace._name + ".sln")
+            path.write_text(data)
 
 
 class MakeGenerator(Generator):

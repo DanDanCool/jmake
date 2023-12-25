@@ -17,10 +17,11 @@ def setupenv(needpath=True):
     if not found:
         print("could not find root directory, quitting...")
 
-    host = jmake.Host()
+    host = jmake.Env()
     host.mode = 'generate' if len(sys.argv) <= 1 else sys.argv[1]
 
     if needpath:
         g = inspect.currentframe().f_back.f_globals
         p = Path(g["__file__"]).absolute()
         host.paths.append(p.parent)
+        host.module = p

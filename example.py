@@ -2,8 +2,10 @@ import jmake
 
 jmake.setupenv() # REQUIRED
 
+host = jmake.Env()
+
 workspace = jmake.Workspace("hello")
-workspace.bin = "bin"
+host.bin = "bin"
 
 lib = jmake.Project("library", target=jmake.Target.SHARED_LIBRARY)
 
@@ -31,7 +33,7 @@ workspace.add(exe)
 
 @jmake.prebuild(lib)
 def copyfiles(project):
-    host = jmake.Host()
+    host = jmake.Env()
     if host.os == "windows":
         pass
 

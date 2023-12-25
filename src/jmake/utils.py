@@ -2,6 +2,7 @@ from pathlib import Path
 import argparse
 import importlib
 import subprocess
+import hashlib
 import re
 from . import builtin
 from . import jmake
@@ -12,7 +13,7 @@ from . import scriptenv
 def glob(dname, expr):
     if type(expr) != list:
         expr = [ expr ]
-    host = jmake.Host()
+    host = jmake.Env()
     p = host.paths[-1] / dname
 
     res = []
@@ -23,7 +24,7 @@ def glob(dname, expr):
 
 # return a path expansion relative to the calling source file
 def fullpath(dname):
-    host = jmake.Host()
+    host = jmake.Env()
     if type(dname) != list:
         dname = [dname]
     return [ str(host.paths[-1] / path) for path in dname ]
@@ -31,7 +32,7 @@ def fullpath(dname):
 
 # return a path expansion relative to the project root directory containing the .git folder
 def rootpath(dname):
-    host = jmake.Host()
+    host = jmake.Env()
     if type(dname) != list:
         dname = [dname]
     return [ str(host.paths[0] / path) for path in dname ]
@@ -42,7 +43,7 @@ def package(name, url=None, branch=None):
     if 'builtin/' in name:
         return builtin.package_builtin(name)
 
-    host = jmake.Host()
+    host = jmake.Env()
     path = Path(rootpath(host.lib)[0]) / name
     if url:
         if not path.exists():
@@ -71,6 +72,10 @@ def package(name, url=None, branch=None):
 
 # added for cmake compatibility
 def configure_file(fname_in, fname_out, opts={}):
+    host = jmake.Env()
+    if host.mode != 'generate':
+        return
+
     lines = []
     with open(fname_in) as f:
         lines = f.readlines()
@@ -103,21 +108,32 @@ def configure_file(fname_in, fname_out, opts={}):
             print(f"possible error on line {i}, variable name not found\n{line}")
             continue
         lines[i] = f"#define {varname} {opts[varname]}" if varname in opts else ''
-    with open(fname_out, 'w') as f:
-        f.writelines(lines)
+
+    data = ''.join(lines)
+    p = Path(fname_out)
+    if p.is_file():
+        # we cannot use file_digest due to encoding differences on windows
+        with open(p, 'r') as f:
+            compare = hashlib.md5(bytes(f.read(), 'utf-8'))
+        digest = hashlib.md5(bytes(data, 'utf-8'))
+        if digest.hexdigest() == compare.hexdigest():
+            return
+
+    with open(p, 'w') as f:
+        count = f.write(data)
+        print(f"configured {fname_in}, wrote {count} bytes to {fname_out}")
 
 def _build(workspace, args):
-    host = jmake.Host()
+    host = jmake.Env()
     gitfolder = host.paths[-1] / ".git"
     if not gitfolder.is_dir():
         return
 
 
 def _generate(workspace, args):
-    host = jmake.Host();
+    host = jmake.Env();
     print("generating make files for " + host.generator)
 
-    host = jmake.Host()
     gen = generator.factory(host.generator)
     gen.generate(workspace)
 
@@ -125,7 +141,7 @@ def _generate(workspace, args):
 def _prebuild_events(workspace, args):
     scriptenv.setupenv(False)
     print("running prebuild events...")
-    host = jmake.Host()
+    host = jmake.Env()
     host.config = args.c
     workspace[args.p].prebuild(args.c)
 
@@ -133,13 +149,13 @@ def _prebuild_events(workspace, args):
 def _postbuild_events(workspace, args):
     scriptenv.setupenv(False)
     print("running postbuild events...")
-    host = jmake.Host()
+    host = jmake.Env()
     host.config = args.c
     workspace[args.p].postbuild(args.c)
 
 
 def generate(workspace, parser=None, subparser=None):
-    host = jmake.Host()
+    host = jmake.Env()
     gitfolder = host.paths[-1] / ".git"
     if not gitfolder.is_dir():
         return

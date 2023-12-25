@@ -19,11 +19,11 @@ Platform = Enum('Platform', [
     ])
 
 
-class Host:
+class Env:
     _instance = None
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(Host, cls).__new__(cls)
+            cls._instance = super(Env, cls).__new__(cls)
             cls._instance.init()
         return cls._instance
 
@@ -43,13 +43,18 @@ class Host:
         self._prebuild = []
         self._postbuild = []
         self.lib = "lib"
+        self.bin = "bin"
         self.config = "debug"
         self.mode = "generate"
         self.paths = [] # stack of paths
+        self.module = ''
 
 
 class Project:
     def __init__(self, name, target):
+        host = Env()
+        self._module = host.module
+
         self._name = name
         self._target = target
         self._files = []
@@ -213,8 +218,6 @@ class Workspace:
         self._name = name
         self._projects = {}
         self._configs = ["debug", "release"]
-
-        self.bin = "bin"
         self.lang = "cpp17"
         self.libc = "mt"
 
@@ -247,7 +250,7 @@ def valid_dependency_project(project):
 
 def prebuild(project=None):
     def global_prebuild(func):
-        host = Host()
+        host = Env()
         host._prebuild.append(func)
         return func
 
@@ -260,7 +263,7 @@ def prebuild(project=None):
 
 def postbuild(project=None):
     def global_postbuild(func):
-        host = Host()
+        host = Env()
         host._postbuild.append(func)
         return func
 
