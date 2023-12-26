@@ -57,7 +57,7 @@ def get_cached(projects):
         else:
             all[project._name] = { 'dirty': False } | cache[project._name]
     if len(dirty):
-        p.write_text(jml.dumps(cache | dirty))
+        p.write_text(jmllib.dumps(cache | dirty))
     return all
 
 
@@ -198,16 +198,20 @@ class VSGenerator(Generator):
             condition = "Condition=\"'$(Configuration)|$(Platform)'=='" + config.capitalize() + "|x64" "'\""
             writer.push("ItemDefinitionGroup", condition)
             writer.push("ClCompile")
-            include = "%(AdditionalIncludeDirectories)"
-            for directory in options[config]["includes"]:
-                p = Path(directory).absolute()
-                include += ";" + str(p)
-            writer.item("AdditionalIncludeDirectories", include)
 
-            compile_options = "%(AdditionalOptions)"
-            for flag in options[config]["compile"]:
-                compile_options += " " + flag
-            writer.item("AdditionalOptions", compile_options)
+            include = [ "%(AdditionalIncludeDirectories)" ] + [ str(Path(dir).absolute()) for dir in options[config]['includes'] ]
+            writer.item("AdditionalIncludeDirectories", ';'.join(include))
+
+            module = []
+            for lib, modules in options[config]['modules'].items():
+                p = Path(host.bin).absolute() / f"{lib}.dir" / config.capitalize()
+                for m in modules:
+                    pm = Path(m[0]).absolute()
+                    module.append(f"{pm.stem}={str(p / pm.name)}.ifc")
+            writer.item('AdditionalModuleDependencies', ';'.join(module))
+
+            compile_options = [ "%(AdditionalOptions)" ] + options[config]['compile']
+            writer.item("AdditionalOptions", ' '.join(compile_options))
 
             writer.item("AssemblerListingLocation", "$(IntDir)")
             writer.item("ExceptionHandling", "Sync")
@@ -289,7 +293,20 @@ class VSGenerator(Generator):
             p = Path(fname).absolute()
             element = "ClCompile" if p.suffix in [".cpp", ".c"] else "ClInclude"
             writer.single(element + " Include=\"" + str(p) + "\"")
+
+        bmipublic = False
+        for fname, public in project._modules:
+            p = Path(fname).absolute()
+            writer.push('ClCompile', f"Include=\"{str(p)}\"")
+            writer.item('CompileAs', 'CompileAsCppModule')
+            writer.pop('ClCompile')
+            bmipublic = bmipublic or public
         writer.pop("ItemGroup")
+
+        if bmipublic:
+            writer.push('PropertyGroup')
+            writer.item('AllProjectBMIsArePublic', 'true')
+            writer.pop('PropertyGroup')
 
         writer.push("ItemGroup")
         for dep in project._dependencies:

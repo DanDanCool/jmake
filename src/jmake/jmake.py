@@ -53,11 +53,12 @@ class Env:
 class Project:
     def __init__(self, name, target):
         host = Env()
-        self._module = host.module
+        self._module = host.module # internal use for caching
 
         self._name = name
         self._target = target
         self._files = []
+        self._modules = [] # list of tuple(fname: str, public: bool)
         self._defines = {}
         self._dependencies = []
         self._include_dirs = []
@@ -88,6 +89,19 @@ class Project:
             self._files.append(files)
         if type(files) == list:
             self._files.extend(files)
+
+    def add_module(self, modules, public=None):
+        if type(modules) == str:
+            if not public:
+                public = False
+            self._modules.append((modules, public))
+        if type(modules) == list:
+            tmp = None
+            if public:
+                tmp = [ (modules[i], public[i]) for i in range(len(modules)) ]
+            else:
+                tmp = [ (module, False) for module in modules ]
+            self._modules.extend(tmp)
 
     def include(self, dirs):
         if type(dirs) == str:
@@ -167,6 +181,7 @@ class Project:
             inc = self._include_dirs + (projfilter._include_dirs if config in self._filters else [])
             lib = self._library_dirs + (projfilter._library_dirs if config in self._filters else [])
             dep = []
+            mod = {}
             for dependency in self.dependencies():
                 if type(dependency) == str:
                     dep.append(dependency)
@@ -176,10 +191,12 @@ class Project:
                     lib.extend(dependency.libpaths)
                     if valid_dependency_project(dependency):
                         dep.append(dependency._name)
+                    mod[dependency._name] = [ module for module, public in dependency._modules if public ]
 
             opt[config]["includes"] = inc
             opt[config]["libpaths"] = lib
             opt[config]["depends"] = dep
+            opt[config]["modules"] = mod
             opt[config]["compile"] = self._compile
             opt[config]["link"] = self._link
 

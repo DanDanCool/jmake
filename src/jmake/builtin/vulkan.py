@@ -8,7 +8,7 @@ vulkan = jmake.Project("vulkan", target=jmake.Target.SHARED_LIBRARY)
 vulkan["binary_only"] = True
 
 def findvulkan(proj):
-    host = jmake.Host()
+    host = jmake.Env()
     if host.mode != 'generate':
         return
 
