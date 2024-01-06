@@ -90,18 +90,11 @@ class Project:
         if type(files) == list:
             self._files.extend(files)
 
-    def add_module(self, modules, public=None):
+    def add_module(self, modules, public=False):
         if type(modules) == str:
-            if not public:
-                public = False
             self._modules.append((modules, public))
         if type(modules) == list:
-            tmp = None
-            if public:
-                tmp = [ (modules[i], public[i]) for i in range(len(modules)) ]
-            else:
-                tmp = [ (module, False) for module in modules ]
-            self._modules.extend(tmp)
+            self._modules.extend([ (module, public) for module in modules ])
 
     def include(self, dirs):
         if type(dirs) == str:
@@ -234,11 +227,18 @@ class Workspace:
     def __init__(self, name):
         self._name = name
         self._projects = {}
+        self._always_build = []
         self._configs = ["debug", "release"]
         self.lang = "cpp17"
         self.libc = "mt"
 
     def add(self, project):
+        if type(project) == Project:
+            project = [ project ]
+        self._always_build.extend(project)
+        self._add(project)
+
+    def _add(self, project):
         if type(project) == Project:
             project = [ project ]
 
@@ -248,7 +248,7 @@ class Workspace:
             self._projects[p._name] = p
 
             deps = [ dep for dep in p._dependencies if valid_dependency_project(dep) ]
-            self.add(deps)
+            self._add(deps)
 
     def libraries(self):
         targets = [ Target.SHARED_LIBRARY, Target.STATIC_LIBRARY, Target.HEADER_LIBRARY ]

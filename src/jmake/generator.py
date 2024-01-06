@@ -370,6 +370,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
         Path(host.bin).mkdir(exist_ok=True)
 
         cache = get_cached(workspace._projects.values())
+        for project in workspace._always_build:
+            cache[project._name]['dirty'] = True
+
         for project in workspace._projects.values():
             self._uuid[project._name] = cache[project._name]['uuid']
         for project in workspace._projects.values():
