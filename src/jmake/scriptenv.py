@@ -18,7 +18,8 @@ def setupenv(needpath=True):
         print("could not find root directory, quitting...")
 
     host = jmake.Env()
-    host.mode = 'generate' if len(sys.argv) <= 1 else sys.argv[1]
+    if not host.mode:
+        host.mode = 'generate' if len(sys.argv) <= 1 else sys.argv[1]
 
     if needpath:
         g = inspect.currentframe().f_back.f_globals

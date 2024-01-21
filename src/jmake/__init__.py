@@ -13,3 +13,4 @@ from .utils import fullpath
 from .utils import rootpath
 from .utils import configure_file
 from .scriptenv import setupenv
+from .builtin import builtin

@@ -45,7 +45,7 @@ class Env:
         self.lib = "lib"
         self.bin = "bin"
         self.config = "debug"
-        self.mode = "generate"
+        self.mode = None
         self.paths = [] # stack of paths
         self.module = ''
 

@@ -1,7 +1,7 @@
 import importlib
 from pathlib import Path
 
-def package_builtin(name):
+def builtin(name):
     p = Path(__file__).parent / f"{name}.py"
     if not p.exists():
         return None

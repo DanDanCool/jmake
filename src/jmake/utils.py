@@ -4,7 +4,6 @@ import importlib
 import subprocess
 import hashlib
 import re
-from . import builtin
 from . import jmake
 from . import generator
 from . import scriptenv
@@ -40,21 +39,26 @@ def rootpath(dname):
 
 # note: local packages must have an empty .git file/folder so setupenv works correctly
 def package(name, url=None, branch=None):
-    if 'builtin/' in name:
-        return builtin.package_builtin(name)
-
     host = jmake.Env()
     path = Path(rootpath(host.lib)[0]) / name
     if url:
         if not path.exists():
             cmd = [ "git", "submodule", "update", "--init", "--recursive" ]
-            subprocess.run(cmd)
+            print(f"package {name}, url: {url} not found! doing git submodule update...")
+            res = subprocess.run(cmd)
+            if res.returncode != 0:
+                print(f"command failed!\n{' '.join(cmd)}")
         if not path.exists():
             cmd = [ "git", "submodule", "add" ]
             if branch:
                 cmd.extend([ "-b", branch ])
-            cmd.extend([ url, str(path) ])
-            subprocess.run(cmd)
+
+            relpath = str(path).removeprefix(str(host.paths[0]))[1:]
+            cmd.extend([ url, relpath ])
+            print(f"package {name}, url: {url} not found! doing git submodule add...")
+            res = subprocess.run(cmd)
+            if res.returncode != 0:
+                print(f"command failed!\n{' '.join(cmd)}")
     else:
         if not path.exists():
             print(f"error, local package '{name}' specified but not found")
