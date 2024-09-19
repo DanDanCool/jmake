@@ -131,17 +131,17 @@ class VSGenerator(Generator):
         header = "DefaultTargets=\"Build\" ToolsVersion=\"" + self._version[host.vs] + xmlns
         writer.push("Project", header)
         writer.push("PropertyGroup")
-        writer.item("PreferredToolArchitecture", "x64")
+        writer.item("PreferredToolArchitecture", project['cpu'])
         writer.pop("PropertyGroup")
 
         options = project.options(self._workspace._configs)
 
         writer.push("ItemGroup", "Label=\"ProjectConfigurations\"")
         for config in self._workspace._configs:
-            properties = "Include=\"" + config.capitalize() + "|x64\""
+            properties = f"Include=\"{config.capitalize()}|{project['cpu']}\""
             writer.push("ProjectConfiguration", properties)
             writer.item("Configuration", config.capitalize())
-            writer.item("Platform", "x64")
+            writer.item("Platform", project['cpu'])
             writer.pop("ProjectConfiguration")
         writer.pop("ItemGroup")
 
@@ -150,7 +150,7 @@ class VSGenerator(Generator):
         writer.item("ProjectGuid", "{" + uuid + "}")
         writer.item("VCProjectVersion", self._version[host.vs])
         writer.item("Keyword", "Win32Proj")
-        writer.item("Platform", "x64")
+        writer.item("Platform", project['cpu'])
         writer.item("ProjectName", project._name)
         writer.pop("PropertyGroup")
 
@@ -165,7 +165,7 @@ class VSGenerator(Generator):
             target = "StaticLibrary"
 
         for config in self._workspace._configs:
-            condition = "Condition=\"'$(Configuration)|$(Platform)'=='" + config.capitalize() + "|x64'\""
+            condition = f"Condition=\"'$(Configuration)|$(Platform)'=='{config.capitalize()}|{project['cpu']}'\""
             writer.push("PropertyGroup", condition + " Label=\"Configuration\"")
             writer.item("ConfigurationType", target)
             writer.item("PlatformToolset", self._toolset[host.vs])
@@ -185,7 +185,7 @@ class VSGenerator(Generator):
         for config in self._workspace._configs:
             outpath = str(Path(host.bin).absolute() / config.capitalize()) + "\\"
             intpath = project._name + ".dir\\" + config.capitalize() + "\\"
-            condition = "Condition=\"'$(Configuration)|$(Platform)'=='" + config.capitalize() + "|x64'\""
+            condition = f"Condition=\"'$(Configuration)|$(Platform)'=='{config.capitalize()}|{project['cpu']}'\""
             writer.item("OutDir", outpath, condition)
             writer.item("IntDir", intpath, condition)
             writer.item("TargetName", project._name, condition)
@@ -195,7 +195,7 @@ class VSGenerator(Generator):
         writer.pop("PropertyGroup")
 
         for config in self._workspace._configs:
-            condition = "Condition=\"'$(Configuration)|$(Platform)'=='" + config.capitalize() + "|x64" "'\""
+            condition = f"Condition=\"'$(Configuration)|$(Platform)'=='{config.capitalize()}|{project['cpu']}'\""
             writer.push("ItemDefinitionGroup", condition)
             writer.push("ClCompile")
 
@@ -245,7 +245,8 @@ class VSGenerator(Generator):
                     tmp = define + "=" + value
                 preprocessor += ";" + tmp
             writer.item("PreprocessorDefinitions", preprocessor)
-            writer.item("ObjectFileName", "$(IntDir)")
+            # as we use the full path we cannot use RelativeDir
+            writer.item("ObjectFileName", "$(IntDir)/%(Directory)")
             writer.pop("ClCompile")
 
             writer.push("Link")
@@ -343,16 +344,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
         data += "\nGlobal"
         data += "\n\tGlobalSection(SolutionConfigurationPlatforms) = preSolution"
         for config in workspace._configs:
-            config = config.capitalize() + "|x64"
+            config = config.capitalize()
             data += "\n\t\t" + config + " = " + config
         data += "\n\tEndGlobalSection"
         data += "\n\tGlobalSection(ProjectConfigurationPlatforms) = postSolution"
         for project in workspace._projects.values():
             uuid = "{" + self._uuid[project._name] + "}"
             for config in workspace._configs:
-                config = config.capitalize() + "|x64"
-                data += "\n\t\t" + uuid + "." + config + ".ActiveCfg = " + config
-                data += "\n\t\t" + uuid + "." + config + ".Build.0 = " + config
+                conf1 = config.capitalize()
+                conf2 = f"{config.capitalize()}|{project['cpu']}"
+                data += "\n\t\t" + uuid + "." + conf1 + ".ActiveCfg = " + conf2
+                data += "\n\t\t" + uuid + "." + conf1 + ".Build.0 = " + conf2
         data += "\n\tEndGlobalSection"
         data += "\n\tGlobalSection(ExtensibilityGlobals) = postSolution"
         data += "\n\t\tSolutionGuid = {" + str(uuid4()) + "}"

@@ -83,6 +83,7 @@ class Project:
         self["warn"] = 3
         self["binary_only"] = False
         self["optimization"] = False
+        self['cpu'] = 'x64'
 
     def add(self, files):
         if type(files) == str:
