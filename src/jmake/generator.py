@@ -169,7 +169,8 @@ class VSGenerator(Generator):
             writer.push("PropertyGroup", condition + " Label=\"Configuration\"")
             writer.item("ConfigurationType", target)
             writer.item("PlatformToolset", self._toolset[host.vs])
-            writer.item("CharacterSet", "Unicode")
+            charset = "Unicode" if project['unicode'] else 'NotSet'
+            writer.item("CharacterSet", charset)
             writer.pop("PropertyGroup")
 
         writer.single("Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.props\"")
